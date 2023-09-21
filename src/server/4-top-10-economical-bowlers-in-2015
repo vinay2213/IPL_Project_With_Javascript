@@ -1,0 +1,78 @@
+const parser = require("csv-parser");
+const fs = require("fs");
+
+const matches = [];
+const deliveries = [];
+
+fs.createReadStream("src/data/matches.csv")
+  .pipe(parser({}))
+  .on("data", (match) => matches.push(match))
+  .on("end", () => {
+    fs.createReadStream("src/data/deliveries.csv")
+      .pipe(parser({}))
+      .on("data", (delivery) => deliveries.push(delivery))
+      .on("end", () => {
+        FindTop10EconomicalBowlersIn2015(matches, deliveries);
+      });
+  });
+
+function FindTop10EconomicalBowlersIn2015(matches, deliveries) {
+  let top10EconomicalBowlersIn2015 = {};
+  const runsConcededByBowler = {};
+  const ballsBowledByBowler = {};
+  const economyOfBowlers = {};
+
+  for (let id in deliveries) {
+    let matchId = deliveries[id].match_id;
+    let match = matches.filter((match) => match.id === matchId)[0];
+
+    if (match.season === "2015") {
+      let bowler = deliveries[id].bowler;
+
+      if (!runsConcededByBowler[bowler]) {
+        runsConcededByBowler[bowler] = 0;
+      }
+
+      let runsConceded =
+        parseInt(deliveries[id].total_runs) -
+        parseInt(deliveries[id].bye_runs) -
+        parseInt(deliveries[id].legbye_runs);
+
+      runsConcededByBowler[bowler] += runsConceded;
+
+      if (!ballsBowledByBowler[bowler]) {
+        ballsBowledByBowler[bowler] = 0;
+      }
+
+      let totalBalls =
+        deliveries[id].wide_runs === "0" && deliveries[id].noball_runs === "0"
+          ? 1
+          : 0;
+
+      ballsBowledByBowler[bowler] += totalBalls;
+
+      if (!economyOfBowlers[bowler]) {
+        economyOfBowlers[bowler] = 0;
+      }
+
+      let economy = (
+        runsConcededByBowler[bowler] /
+        (ballsBowledByBowler[bowler] / 6.0)
+      ).toFixed(2);
+
+      economyOfBowlers[bowler] = economy;
+    }
+  }
+
+  let entries = Object.entries(economyOfBowlers);
+  entries.sort((a, b) => a[1] - b[1]);
+  let sortedEntries = entries.slice(0, 10);
+  top10EconomicalBowlersIn2015 = Object.fromEntries(sortedEntries);
+
+  fs.writeFileSync(
+    "src/public/output/top10EconomicalBowlersIn2015.json",
+    JSON.stringify(top10EconomicalBowlersIn2015)
+  );
+
+  //console.log(top10EconomicalBowlersIn2015);
+}

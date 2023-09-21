@@ -1,0 +1,42 @@
+const parser = require("csv-parser");
+const fs = require("fs");
+
+const matches = [];
+const deliveries = [];
+
+fs.createReadStream("src/data/matches.csv")
+  .pipe(parser({}))
+  .on("data", (match) => matches.push(match))
+  .on("end", () => {
+    fs.createReadStream("src/data/deliveries.csv")
+      .pipe(parser({}))
+      .on("data", (delivery) => deliveries.push(delivery))
+      .on("end", () => {
+        findExtraRunsConcededPerTeamIn2016(matches, deliveries);
+      });
+  });
+
+function findExtraRunsConcededPerTeamIn2016(matches, deliveries) {
+  const extraRunsConcededPerTeamIn2016 = {};
+
+  for (let id in deliveries) {
+    let matchId = deliveries[id].match_id;
+    let match = matches.filter((match) => match.id === matchId)[0];
+
+    if (match.season === "2016") {
+      let extraRuns = parseInt(deliveries[id].extra_runs);
+      let bowlingTeam = deliveries[id].bowling_team;
+
+      if (extraRunsConcededPerTeamIn2016[bowlingTeam]) {
+        extraRunsConcededPerTeamIn2016[bowlingTeam] += extraRuns;
+      } else {
+        extraRunsConcededPerTeamIn2016[bowlingTeam] = extraRuns;
+      }
+    }
+  }
+
+  fs.writeFileSync(
+    "src/public/output/extraRunsConcededPerTeamIn2016.json",
+    JSON.stringify(extraRunsConcededPerTeamIn2016)
+  );
+}
